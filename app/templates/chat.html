@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Chat</title>
+    <style>
+        #chatbox {
+            border: 1px solid #ccc;
+            width: 500px;
+            height: 300px;
+            overflow-y: scroll;
+            padding: 10px;
+            margin: 10px 0;
+            background: #f9f9f9;
+        }
+        .message {
+            margin: 5px 0;
+            padding: 5px;
+        }
+        .system-message {
+            color: #666;
+            font-style: italic;
+        }
+        #connection-status.connected {
+            color: green;
+        }
+        #connection-status.disconnected {
+            color: red;
+        }
+    </style>
+</head>
+<body>
+    <h1>Chat</h1>
+    
+    <div id="login-section">
+        <label for="username">Введите ваше имя:</label>
+        <input type="text" id="username" required>
+        <button type="button" onclick="connectToChat()">Подключиться</button>
+    </div>
+    
+    <div id="connection-status" class="disconnected">Не подключено</div>
+    
+    <div id="chat-section" style="display: none;">
+        <div id="chatbox"></div>
+        
+        <form onsubmit="event.preventDefault(); sendMessage();">
+            <input type="text" id="message" required placeholder="Введите сообщение...">
+            <button type="submit">Отправить</button>
+        </form>
+    </div>
+
+    <script>
+        let socket;
+        let username;
+        const chatbox = document.getElementById("chatbox");
+        const statusDiv = document.getElementById("connection-status");
+        const messageInput = document.getElementById("message");
+        const loginSection = document.getElementById("login-section");
+        const chatSection = document.getElementById("chat-section");
+
+        function connectToChat() {
+            username = document.getElementById("username").value.trim();
+            if (username) {
+                try {
+                    socket = new WebSocket(`ws://${window.location.host}/ws/${username}`);
+                    
+                    socket.onopen = function() {
+                        statusDiv.className = 'connected';
+                        statusDiv.textContent = 'Подключено';
+                        loginSection.style.display = 'none';
+                        chatSection.style.display = 'block';
+                        messageInput.disabled = false;
+                        messageInput.focus();
+                        console.log('WebSocket connection established');
+                    };
+                    
+                    socket.onmessage = function(event) {
+                        console.log('Message received:', event.data);
+                        const messageDiv = document.createElement("div");
+                        messageDiv.className = "message";
+                        messageDiv.textContent = event.data;
+                        chatbox.appendChild(messageDiv);
+                        chatbox.scrollTop = chatbox.scrollHeight;
+                    };
+                    
+                    socket.onerror = function(error) {
+                        console.error('WebSocket error:', error);
+                        statusDiv.className = 'disconnected';
+                        statusDiv.textContent = 'Ошибка подключения';
+                    };
+                    
+                    socket.onclose = function() {
+                        console.log('WebSocket connection closed');
+                        statusDiv.className = 'disconnected';
+                        statusDiv.textContent = 'Отключено';
+                        messageInput.disabled = true;
+                    };
+                    
+                } catch (error) {
+                    console.error('Connection error:', error);
+                    statusDiv.textContent = 'Ошибка: ' + error.message;
+                }
+            }
+        }
+
+        function sendMessage() {
+            const message = messageInput.value.trim();
+            if (socket && socket.readyState === WebSocket.OPEN && message) {
+                console.log('Sending message:', message);
+                socket.send(message);
+                messageInput.value = "";
+            } else {
+                console.log('Cannot send message - socket not ready');
+            }
+        }
+
+        messageInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+
+        document.getElementById("username").focus();
+    </script>
+</body>
+</html>
